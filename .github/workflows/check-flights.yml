@@ -1,0 +1,44 @@
+name: Flight Deal Alert (Japan & SEA)
+
+on:
+  schedule:
+    # Public 저장소는 무제한 무료 (15분마다 체크)
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      send_test:
+        description: '테스트 알림 보내기 (true/false)'
+        required: false
+        default: 'true'
+
+permissions:
+  contents: write
+
+jobs:
+  check-flights:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Check Flight Deal Feeds
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          SEND_TEST_ON_MANUAL: ${{ github.event.inputs.send_test == 'true' && '1' || '0' }}
+        run: python check_flights.py
+
+      - name: Save notified state if changed
+        run: |
+          if [ -n "$(git status --porcelain notified_deals.json)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add notified_deals.json
+            git commit -m "Update notified_deals.json"
+            git push
+          fi
